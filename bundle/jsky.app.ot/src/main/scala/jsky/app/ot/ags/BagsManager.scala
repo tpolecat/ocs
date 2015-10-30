@@ -14,6 +14,8 @@ import edu.gemini.spModel.obs.ObservationStatus
 import edu.gemini.spModel.obs.context.ObsContext
 import edu.gemini.spModel.rich.shared.immutable._
 import edu.gemini.spModel.target.env.{BagsResult, OptionsList, GuideProbeTargets, TargetEnvironment}
+import edu.gemini.spModel.target.system.CoordinateParam.Units
+import edu.gemini.spModel.target.system.HmsDegTarget
 import jsky.app.ot.OT
 import jsky.app.ot.tpe.{TpeContext, GuideStarSupport, GemsGuideStarWorker, GuideStarWorker}
 
@@ -216,8 +218,25 @@ object BagsManager {
 
     // Now compare the two lists to make sure they have the same BAGS targets.
     (oldGpt.size == newGpt.size) &&
-      oldGpt.forall(ogpt => newGpt.exists(ngpt => ngpt.getGuider == ogpt.getGuider &&
-        ngpt.getBagsResult.target.get.getTarget.equals(ogpt.getBagsResult.target.get.getTarget)))
+      oldGpt.forall(ogpt => newGpt.exists { ngpt =>
+
+        // We consider targets equal if their coordinates are within a thousandth of a degree
+        // in both RA and Dec. This addresses rounding issues introduced by the OT's coordinate
+        // editors. We only consider the sidereal case.
+        val targetsEqual = {
+          val r0 = ngpt.getBagsResult.target.map(_.getTarget)
+          val r1 = ogpt.getBagsResult.target.map(_.getTarget)
+          (r0, r1) match {
+            case (Some(a: HmsDegTarget), Some(b: HmsDegTarget)) =>
+              Math.abs(a.getRa .getAs(Units.DEGREES) - b.getRa .getAs(Units.DEGREES)) < 0.0001 &&
+              Math.abs(a.getDec.getAs(Units.DEGREES) - b.getDec.getAs(Units.DEGREES)) < 0.0001
+            case (o1, o2) => o1 == o2
+          }
+        }
+
+        ngpt.getGuider == ogpt.getGuider && targetsEqual
+
+      })
   }
 
   // Given a target environment, clear all of the BAGS targets from it.
