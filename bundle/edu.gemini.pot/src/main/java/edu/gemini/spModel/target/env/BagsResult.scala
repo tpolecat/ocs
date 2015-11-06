@@ -1,66 +1,74 @@
 package edu.gemini.spModel.target.env
 
 import edu.gemini.shared.util.immutable.{Option => GOption}
-import edu.gemini.spModel.pio.{Pio, PioFactory, ParamSet}
+import edu.gemini.spModel.pio.codec.ParamSetCodec
+import edu.gemini.spModel.pio.ParamSet
 import edu.gemini.spModel.target.SPTarget
 import edu.gemini.spModel.rich.shared.immutable._
 
-import scala.collection.JavaConverters._
+sealed abstract class BagsResult extends Cloneable { outer =>
+  import BagsResult._
 
-sealed trait BagsResult extends Cloneable {
-  val id: String
-  val target: Option[SPTarget] = None
-  def targetAsJava: GOption[SPTarget] = target.asGeminiOpt
-  override def clone: BagsResult = this
-
-  def getParamSet(factory: PioFactory): ParamSet = {
-    val paramSet = factory.createParamSet(BagsResult.BagsResultParamSetName)
-    Pio.addParam(factory, paramSet, BagsResult.BagsResultParamIdName, id)
-    target.foreach { t =>
-      val bagsParamSet = factory.createParamSet(BagsResult.BagsTargetParamSetName)
-      bagsParamSet.addParamSet(t.getParamSet(factory))
-      paramSet.addParamSet(bagsParamSet)
+  def fold[A](nsp: => A, ntf: BagsChecksum => A, wt: (BagsChecksum, SPTarget) => A): A =
+    this match {
+      case NoSearchPerformed => nsp
+      case NoTargetFound(vm) => ntf(vm)
+      case WithTarget(vm, t) => wt(vm, t)
     }
-    paramSet
+
+  override def clone: BagsResult =
+    fold(NoSearchPerformed, NoTargetFound, (m, t) => WithTarget(m, t.clone))
+
+  def targetOption: Option[SPTarget] =
+    fold(None, _ => None, (_, t) => Some(t))
+
+  def versionMapOption: Option[BagsChecksum] =
+    fold(None, Some(_), (m, _) => Some(m))
+
+  lazy val asJava: JavaAPI =
+    new JavaAPI
+
+  class JavaAPI {
+
+    def targetOption: GOption[SPTarget] =
+      outer.targetOption.asGeminiOpt
+
+    def versionMapOption: GOption[BagsChecksum] =
+      outer.versionMapOption.asGeminiOpt
+
+    def encode(key: String): ParamSet =
+      ???
+
   }
 
-  override def toString = id
 }
 
 object BagsResult {
-  case object NoSearchPerformed extends BagsResult {
-    override val id = "NoSearchPerformed"
+
+  case object NoSearchPerformed extends BagsResult
+  case class NoTargetFound(versionMap: BagsChecksum) extends BagsResult
+  case class WithTarget(versionMap: BagsChecksum, target: SPTarget) extends BagsResult
+
+  implicit val CodecBagsResult: ParamSetCodec[BagsResult] =
+    ???
+
+  lazy val asJava: JavaCompanionAPI =
+    new JavaCompanionAPI
+
+  class JavaCompanionAPI {
+
+    def decode(ps: ParamSet): BagsResult =
+      CodecBagsResult.decode(ps).fold(a => sys.error(a.toString), identity)
+
+    def noSearchPerformed: BagsResult =
+      NoSearchPerformed
+
+    def noTargetFound(versionMap: BagsChecksum): BagsResult =
+      NoTargetFound(versionMap)
+
+    def withTarget(versionMap: BagsChecksum, target: SPTarget): BagsResult =
+      WithTarget(versionMap, target)
+
   }
 
-  case object NoTargetFound extends BagsResult {
-    override val id = "NoTargetFound"
-  }
-
-  case class  WithTarget(tgt: SPTarget) extends BagsResult {
-    override val id = WithTarget.id
-    override val target = Some(tgt)
-    override def clone = WithTarget(tgt.clone())
-    override def toString = s"$id(${target.toString})"
-  }
-  object WithTarget {
-    val id = "WithTarget"
-  }
-
-
-  val BagsResultParamSetName:  String = "bagsResult"
-  val BagsResultParamIdName:   String = "bagsResultId"
-  val BagsTargetParamSetName:  String = "bagsTarget"
-
-  def fromParamSet(parent: ParamSet): BagsResult = {
-    Option(parent.getParamSet(BagsResultParamSetName)).flatMap { ps =>
-      // We get the param ID and then use that to construct the object.
-      val paramId = Option(ps.getParam(BagsResultParamIdName)).map(_.getValue)
-      val target = Option(ps.getParamSet(BagsTargetParamSetName)).flatMap(_.getParamSets.asScala.headOption).map(SPTarget.fromParamSet)
-
-      paramId.collect {
-        case NoTargetFound.id => NoTargetFound
-        case WithTarget.id if target.isDefined => WithTarget(target.get)
-      }
-    }.getOrElse(NoSearchPerformed)
-  }
 }
