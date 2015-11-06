@@ -144,7 +144,7 @@ public final class EdCompTargetList extends OtItemEditor<ISPObsComponent, Target
      */
     private void updateRemovePrimaryButtonsAndDetailEditor(final TargetEnvironment env) {
         final boolean editable   = OTOptions.areRootAndCurrentObsIfAnyEditable(getProgram(), getContextObservation());
-        final boolean curNotBags = !env.getGroups().exists(gg -> gg.getAllContaining(_curPos).exists(gpt -> gpt.getBagsResult().targetAsJava().exists(_curPos::equals)));
+        final boolean curNotBags = !env.getGroups().exists(gg -> gg.getAllContaining(_curPos).exists(gpt -> gpt.getBagsResult().asJava().targetOption().exists(_curPos::equals)));
         final boolean curNotBase = _curPos != env.getBase();
         _w.removeButton.setEnabled(curNotBase && curNotBags && editable);
         _w.primaryButton.setEnabled(enablePrimary(_curPos, env) && editable);

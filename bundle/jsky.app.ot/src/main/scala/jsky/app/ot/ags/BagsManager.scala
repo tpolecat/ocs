@@ -206,18 +206,18 @@ object BagsManager {
   // Check two target environments to see if the BAGS targets match exactly between them.
   def bagsTargetsMatch(oldEnv: TargetEnvironment, newEnv: TargetEnvironment): Boolean = {
     // Find a group with a BAGS target in it in the old and new envs.
-    val oldGroup = oldEnv.getGroups.asScala.find(gg => gg.getAll.asScala.exists(_.getBagsResult.target.isDefined))
-    val newGroup = newEnv.getGroups.asScala.find(gg => gg.getAll.asScala.exists(_.getBagsResult.target.isDefined))
+    val oldGroup = oldEnv.getGroups.asScala.find(gg => gg.getAll.asScala.exists(_.getBagsResult.targetOption.isDefined))
+    val newGroup = newEnv.getGroups.asScala.find(gg => gg.getAll.asScala.exists(_.getBagsResult.targetOption.isDefined))
 
     // Now compare the two groups to see if they have the same BAGS targets.
     // Filter the GuideProbeTargets of the oldGroup to make sure that we are only looking at GPTs with BAGS.
-    val oldGpt = oldGroup.toList.flatMap(gg => gg.getAll.asScala.filter(_.getBagsResult.target.isDefined))
-    val newGpt = newGroup.toList.flatMap(gg => gg.getAll.asScala.filter(_.getBagsResult.target.isDefined))
+    val oldGpt = oldGroup.toList.flatMap(gg => gg.getAll.asScala.filter(_.getBagsResult.targetOption.isDefined))
+    val newGpt = newGroup.toList.flatMap(gg => gg.getAll.asScala.filter(_.getBagsResult.targetOption.isDefined))
 
     // Now compare the two lists to make sure they have the same BAGS targets.
     (oldGpt.size == newGpt.size) &&
       oldGpt.forall(ogpt => newGpt.exists(ngpt => ngpt.getGuider == ogpt.getGuider &&
-        ngpt.getBagsResult.target.get.getTarget.equals(ogpt.getBagsResult.target.get.getTarget)))
+        ngpt.getBagsResult.targetOption.get.getTarget.equals(ogpt.getBagsResult.targetOption.get.getTarget)))
   }
 
   // Given a target environment, clear all of the BAGS targets from it.

@@ -202,7 +202,7 @@ public final class GuideProbeTargets implements Serializable, TargetContainer, I
         if (manualTargets == null)
             throw new IllegalArgumentException("missing target options");
 
-        final boolean primaryIsBags = compareTargets(bagsResult.targetAsJava(), primaryTarget);
+        final boolean primaryIsBags = compareTargets(bagsResult.asJava().targetOption(), primaryTarget);
         if (!primaryIsBags && !primaryTarget.forall(manualTargets::contains))
             throw new IllegalArgumentException("primary target must be either BAGS target or in manual targets");
 
@@ -214,13 +214,13 @@ public final class GuideProbeTargets implements Serializable, TargetContainer, I
 
     // Convenience functions for the BAGS target.
     private boolean hasBagsTarget() {
-        return bagsResult.targetAsJava().isDefined();
+        return bagsResult.asJava().targetOption().isDefined();
     }
     private boolean targetIsBagsTarget(final SPTarget target) {
-        return bagsResult.targetAsJava().exists(target::equals);
+        return bagsResult.asJava().targetOption().exists(target::equals);
     }
     private Option<SPTarget> getBagsTarget() {
-        return bagsResult.targetAsJava();
+        return bagsResult.asJava().targetOption();
     }
 
     /**
@@ -285,7 +285,7 @@ public final class GuideProbeTargets implements Serializable, TargetContainer, I
         // 2. Primary is BAGS
         // 3. Primary is in manual list
         final Option<SPTarget> primaryTargetClone = primaryIsBagsTarget() ?
-                bagsResultClone.targetAsJava() :
+                bagsResultClone.asJava().targetOption() :
                 primaryTarget.map(t -> manualTargetsClone.get(manualTargets.indexOf(t)));
 
         return new GuideProbeTargets(guider, bagsResultClone, primaryTargetClone, manualTargetsClone);
@@ -335,7 +335,7 @@ public final class GuideProbeTargets implements Serializable, TargetContainer, I
             final int oldIndex = manualTargets.indexOf(target);
             final int newIndex = oldIndex + 1 < manualTargets.size() ? oldIndex + 1
                     : (oldIndex - 1 >= 0 ? oldIndex - 1 : -1);
-            final Option<SPTarget> primaryTargetNew = newIndex == -1 ? bagsResult.targetAsJava() : new Some<>(manualTargets.get(newIndex));
+            final Option<SPTarget> primaryTargetNew = newIndex == -1 ? bagsResult.asJava().targetOption() : new Some<>(manualTargets.get(newIndex));
             return new GuideProbeTargets(guider, bagsResult, primaryTargetNew, manualTargetsNew);
         }
     }
@@ -375,7 +375,7 @@ public final class GuideProbeTargets implements Serializable, TargetContainer, I
         if (bagsResult.equals(result))
             return this;
 
-        final Option<SPTarget> primaryTargetNew = primaryIsBagsTarget() || primaryTarget.isEmpty() ? result.targetAsJava() : primaryTarget;
+        final Option<SPTarget> primaryTargetNew = primaryIsBagsTarget() || primaryTarget.isEmpty() ? result.asJava().targetOption() : primaryTarget;
         return new GuideProbeTargets(guider, result, primaryTargetNew, manualTargets);
     }
 
@@ -464,7 +464,7 @@ public final class GuideProbeTargets implements Serializable, TargetContainer, I
      */
     public GuideProbeTargets withPrimaryByIndex(final int index) {
         if (index == 0 && hasBagsTarget())
-            return new GuideProbeTargets(guider, bagsResult, bagsResult.targetAsJava(), manualTargets);
+            return new GuideProbeTargets(guider, bagsResult, bagsResult.asJava().targetOption(), manualTargets);
 
         final int bagsAdjustment = hasBagsTarget() ? 1 : 0;
         final SPTarget primaryNew = manualTargets.get(index - bagsAdjustment);
@@ -505,7 +505,7 @@ public final class GuideProbeTargets implements Serializable, TargetContainer, I
      */
     public GuideProbeTargets withManualTargets(final ImList<SPTarget> manualTargetsNew) {
         // If the primary target is None, or the primary is the BAGS, then just return with the new list.
-        if (primaryTarget.equals(bagsResult.targetAsJava()))
+        if (primaryTarget.equals(bagsResult.asJava().targetOption()))
             return new GuideProbeTargets(guider, bagsResult, primaryTarget, manualTargetsNew);
 
         final Option<SPTarget> primaryTargetNew = primaryTarget.forall(manualTargetsNew::contains) ? primaryTarget : NO_TARGET;
@@ -536,12 +536,13 @@ public final class GuideProbeTargets implements Serializable, TargetContainer, I
 
 
     public static final String GUIDER_PARAM_SET_NAME = "guider";
+    public static final String BAGS_RESULT_PARAM_SET_NAME = "bags-result";
 
     public ParamSet getParamSet(final PioFactory factory) {
         final ParamSet paramSet = factory.createParamSet(GUIDER_PARAM_SET_NAME);
 
         Pio.addParam(factory, paramSet, "key", getGuider().getKey());
-        paramSet.addParamSet(bagsResult.getParamSet(factory));
+        paramSet.addParamSet(bagsResult.asJava().encode(BAGS_RESULT_PARAM_SET_NAME));
 
 
         // If a primary target is set, store the index.
@@ -561,7 +562,7 @@ public final class GuideProbeTargets implements Serializable, TargetContainer, I
 
 
         // Read in the bagsResult if there is one.
-        final BagsResult bagsResult = BagsResult$.MODULE$.fromParamSet(parent);
+        final BagsResult bagsResult = BagsResult$.MODULE$.asJava().decode(parent.getParamSet(BAGS_RESULT_PARAM_SET_NAME));
 
         // Primary index.
         final int primaryIndex = Pio.getIntValue(parent, "primary", -1);

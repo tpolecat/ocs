@@ -225,7 +225,7 @@ public class TpeGuidePosFeature extends TpePositionFeature
             Option<ObsContext> ctx = tme.source.getObsContext();
             if (ctx.isEmpty()) return;
 
-            obsComp.setTargetEnvironment(group.add(pos, false, ctx.getValue()));
+            obsComp.setTargetEnvironment(group.add(pos, ctx.getValue()));
             _iw.getContext().targets().commit();
         }
     }
