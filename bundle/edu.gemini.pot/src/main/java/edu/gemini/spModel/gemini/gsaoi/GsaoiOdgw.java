@@ -55,7 +55,7 @@ public enum GsaoiOdgw implements ValidatableGuideProbe {
             return new Some<>(lookup(idOpt.getValue()));
         }
 
-        public TargetEnvironment add(final SPTarget guideStar, final boolean isBags, final ObsContext ctx) {
+        public TargetEnvironment add(final SPTarget guideStar, final ObsContext ctx) {
             // Select the appropriate guider, if any.
             final TargetEnvironment env = ctx.getTargets();
             final Option<GuideProbe> probeOpt = select(guideStar.getTarget().getSkycalcCoordinates(), ctx);
@@ -71,9 +71,8 @@ public enum GsaoiOdgw implements ValidatableGuideProbe {
             if (gptOpt.exists(gpt -> gpt.containsTarget(guideStar)))
                 return env;
 
-            final GuideProbeTargets gptNew = gptOpt.map(gpt -> isBags
-                    ? gpt.withBagsResult(BagsResult.WithTarget$.MODULE$.apply(guideStar))
-                    : gpt.addManualTarget(guideStar)).
+            final GuideProbeTargets gptNew = gptOpt.map(gpt ->
+                    gpt.addManualTarget(guideStar)).
                     getOrElse(GuideProbeTargets.create(probe, guideStar)).
                     withExistingPrimary(guideStar);
             final GuideGroup grpNew = grp.put(gptNew);

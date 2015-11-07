@@ -6,6 +6,7 @@ import edu.gemini.ags.gems.mascot.MascotProgress;
 import edu.gemini.catalog.votable.CatalogException;
 import edu.gemini.catalog.votable.ConeSearchBackend;
 import edu.gemini.pot.ModelConverters;
+import edu.gemini.pot.sp.SPNodeKey;
 import edu.gemini.shared.util.immutable.*;
 import edu.gemini.skycalc.Angle;
 import edu.gemini.shared.skyobject.coords.HmsDegCoordinates;
@@ -29,6 +30,8 @@ import jsky.util.gui.StatusLogger;
 
 import java.util.*;
 import java.util.concurrent.CancellationException;
+
+import static edu.gemini.shared.util.immutable.ScalaConverters.ScalaOptionOps;
 
 /**
  * OT-36: Automate Gems guide star selection in background thread.
@@ -117,58 +120,9 @@ public class GemsGuideStarWorker extends SwingWorker implements MascotProgress {
         applyResults(ctx, new Some<>(gemsGuideStars), false);
     }
 
+    private static final GemsGuideStarWorkerHelper helper = new GemsGuideStarWorkerHelper();
     public static void applyResults(final TpeContext ctx, final Option<GemsGuideStars> gemsGuideStarsOpt, boolean isBags) {
-        gemsGuideStarsOpt.foreach(gemsGuideStars -> {
-            final SPInstObsComp inst = ctx.instrument().orNull();
-            if (inst != null) {
-                inst.setPosAngleDegrees(gemsGuideStars.pa().toDegrees());
-                ctx.instrument().commit();
-            }
-        });
-
-        final TargetObsComp targetObsComp = ctx.targets().orNull();
-        if (targetObsComp != null) {
-            final TargetEnvironment oldEnv = targetObsComp.getTargetEnvironment();
-
-            // If this is called from BAGS, we need to find out if there was a previous BAGS guide group and whether
-            // or not it was the primary group.
-            final boolean makeBagsGroupPrimary;
-            final TargetEnvironment clearedEnv;
-            if (isBags) {
-                final GuideEnvironment guideEnv = oldEnv.getGuideEnvironment();
-                final Option<GuideGroup> bagsGroup = guideEnv.getOptions().find(gg -> gg.getAll().exists(GuideProbeTargets::primaryIsBagsTarget));
-                makeBagsGroupPrimary = guideEnv.getOptions().isEmpty() || bagsGroup.exists(bg -> oldEnv.getGuideEnvironment().getPrimary().exists(bg::equals));
-                clearedEnv = BagsManager.clearBagsTargets(oldEnv);
-            } else {
-                makeBagsGroupPrimary = false;
-                clearedEnv = oldEnv;
-            }
-
-            // If this is BAGS running, denote the primary selected targets as the BAGS targets.
-            // This is a horrible way to do things, but we don't want to mess with the actual GeMS lookup code so we
-            // transform the guide group as necessary for BAGS.
-            final TargetEnvironment finalEnv = gemsGuideStarsOpt.map(gemsGuideStars -> {
-                // Determine / adapt the new guide group representing the GeMS selection.
-                final GuideGroup group;
-                if (isBags) {
-                    final ImList<GuideProbeTargets> gptList = gemsGuideStars.guideGroup().getAll().map(gpt ->
-                                    gpt.getPrimary().map(primary -> gpt.removeTarget(primary).withBagsResult(BagsResult.WithTarget$.MODULE$.apply(primary))).getOrElse(gpt)
-                    );
-                    group = gemsGuideStars.guideGroup().putAll(gptList);
-                    return makeBagsGroupPrimary ? clearedEnv.setPrimaryGuideGroup(group) :
-                            clearedEnv.setGuideEnvironment(clearedEnv.getGuideEnvironment().setOptions(clearedEnv.getGroups().cons(group)));
-                } else {
-                    group = gemsGuideStars.guideGroup();
-                    return clearedEnv.setPrimaryGuideGroup(group);
-                }
-            }).getOrElse(clearedEnv);
-
-            // If BAGS is running, only change if the target environments differ.
-            if (!isBags || !BagsManager.bagsTargetsMatch(oldEnv, finalEnv)) {
-                targetObsComp.setTargetEnvironment(finalEnv);
-                ctx.targets().commit();
-            }
-        }
+        helper.applyResults(ctx, gemsGuideStarsOpt, isBags);
     }
 
     /**

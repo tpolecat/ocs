@@ -85,11 +85,11 @@ object AgsStrategy {
      * Creates a new TargetEnvironment with guide stars for each assignment in
      * the Selection.
      */
-    def applyTo(env: TargetEnvironment): TargetEnvironment =
+    def applyTo(env: TargetEnvironment, f: SPTarget => BagsResult): TargetEnvironment =
       (env /: assignments) { (curEnv, ass) =>
         val target = new SPTarget(HmsDegTarget.fromSkyObject(ass.guideStar.toOldModel))
         val oldGpt = curEnv.getPrimaryGuideProbeTargets(ass.guideProbe).asScalaOpt
-        val newGpt = oldGpt.getOrElse(GuideProbeTargets.create(ass.guideProbe)).withBagsResult(BagsResult.WithTarget(target))
+        val newGpt = oldGpt.getOrElse(GuideProbeTargets.create(ass.guideProbe)).withBagsResult(f(target))
         curEnv.putPrimaryGuideProbeTargets(newGpt)
       }
   }

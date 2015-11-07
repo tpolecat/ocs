@@ -22,7 +22,7 @@ import edu.gemini.spModel.gemini.phoenix.InstPhoenix
 import edu.gemini.spModel.guide.{ValidatableGuideProbe, GuideProbe}
 import edu.gemini.spModel.obs.context.ObsContext
 import edu.gemini.spModel.target.SPTarget
-import edu.gemini.spModel.target.env.TargetEnvironment
+import edu.gemini.spModel.target.env.{BagsChecksum, BagsResult, TargetEnvironment}
 import edu.gemini.spModel.target.obsComp.PwfsGuideProbe
 import edu.gemini.spModel.telescope.IssPort
 import edu.gemini.spModel.telescope.PosAngleConstraint.FIXED_180
@@ -43,7 +43,7 @@ class SingleProbeStrategySpec extends Specification with NoTimeConversions {
 
   private def applySelection(ctx: ObsContext, sel: AgsStrategy.Selection): ObsContext = {
     // Make a new TargetEnvironment with the guide probe assignments.
-    sel.applyTo(ctx.getTargets) |> {ctx.withTargets} |> {_.withPositionAngle(sel.posAngle.toOldModel)}
+    sel.applyTo(ctx.getTargets, BagsResult.WithTarget(BagsChecksum.empty, _)) |> {ctx.withTargets} |> {_.withPositionAngle(sel.posAngle.toOldModel)}
   }
 
   def offset(p: Int, q: Int): SkycalcOffset =

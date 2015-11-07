@@ -12,6 +12,23 @@ trait ParamSetCodec[A] { outer =>
   
   def decode(ps: ParamSet): PioError \/ A
 
+  def xmap[B](f: A => B)(g: B => A): ParamSetCodec[B] =
+    new ParamSetCodec[B] {
+      def encode(key: String, a: B): ParamSet =
+        outer.encode(key, g(a))
+      def decode(ps: ParamSet): \/[PioError, B] =
+        outer.decode(ps).map(f)
+    }
+
+  // xmap with flatMap on read
+  def xmapF[B](f: A => PioError \/ B)(g: B => A): ParamSetCodec[B] =
+    new ParamSetCodec[B] {
+      def encode(key: String, a: B): ParamSet =
+        outer.encode(key, g(a))
+      def decode(ps: ParamSet): \/[PioError, B] =
+        outer.decode(ps).flatMap(f)
+    }
+
   def withParam[B](key: String, lens: A @> B)(implicit pc: ParamCodec[B]): ParamSetCodec[A] =
     new ParamSetCodec[A] {
       def encode(key0: String, a: A): ParamSet = {
@@ -93,6 +110,22 @@ trait ParamSetCodec[A] { outer =>
       def decode(ps: ParamSet): PioError \/ A =
         outer.decode(ps).flatMap { a =>
           ps.getParamSets(key).asScala.toList.traverseU(psc.decode).map(lens.set(a, _))
+        }
+    }
+
+  def withManyParams[B](key: String, lens: A @> List[B])(implicit pc: ParamCodec[B]): ParamSetCodec[A] =
+    new ParamSetCodec[A] {
+      def encode(key0: String, a: A): ParamSet = {
+        val ps0 = outer.encode(key0, a)
+        lens.get(a).foreach { b =>
+          val ps1 = pc.encode(key, b)
+          ps0.addParam(ps1)
+        }
+        ps0
+      }
+      def decode(ps: ParamSet): PioError \/ A =
+        outer.decode(ps).flatMap { a =>
+          ps.getParams(key).asInstanceOf[java.util.List[Param]].asScala.toList.traverseU(pc.decode).map(lens.set(a, _))
         }
     }
 

@@ -1,5 +1,7 @@
 package edu.gemini.spModel.pio.codec
 
+import java.util.UUID
+
 import scalaz._, Scalaz._
 
 import edu.gemini.spModel.pio._
@@ -52,6 +54,18 @@ object ParamCodec {
         case \/-(s) => s.parseLong.disjunction.leftMap(_ => ParseError(p.getName, s, "Long"))
         case -\/(e) => -\/(e)
       }          
+    }
+
+  implicit val UuidParamCodec: ParamCodec[UUID] =
+    new ParamCodec[UUID] {
+      def encode(key: String, a: UUID): Param = StringParamCodec.encode(key, a.toString)
+      def decode(p: Param): \/[PioError, UUID] =
+        StringParamCodec.decode(p).flatMap { s =>
+          try UUID.fromString(s).right
+          catch {
+            case _: IllegalArgumentException => ParseError(p.getName, s, "UUID").left
+          }
+        }
     }
 
 }

@@ -18,7 +18,7 @@ import edu.gemini.spModel.gems.{GemsGuideStarType, GemsTipTiltMode}
 import edu.gemini.spModel.guide.GuideSpeed
 import edu.gemini.spModel.obs.context.ObsContext
 import edu.gemini.spModel.target.SPTarget
-import edu.gemini.spModel.target.env.TargetEnvironment
+import edu.gemini.spModel.target.env.{BagsChecksum, BagsResult, TargetEnvironment}
 import edu.gemini.spModel.target.obsComp.PwfsGuideProbe
 import edu.gemini.spModel.telescope.IssPort
 import org.specs2.mutable.Specification
@@ -39,7 +39,7 @@ class GemsStrategySpec extends Specification with NoTimeConversions {
 
   private def applySelection(ctx: ObsContext, sel: AgsStrategy.Selection): ObsContext = {
     // Make a new TargetEnvironment with the guide probe assignments.
-    sel.applyTo(ctx.getTargets) |> {ctx.withTargets} |> {_.withPositionAngle(sel.posAngle.toOldModel)}
+    sel.applyTo(ctx.getTargets, BagsResult.WithTarget(BagsChecksum.empty, _)) |> {ctx.withTargets} |> {_.withPositionAngle(sel.posAngle.toOldModel)}
   }
 
   "GemsStrategy" should {
