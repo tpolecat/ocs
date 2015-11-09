@@ -562,7 +562,9 @@ public final class GuideProbeTargets implements Serializable, TargetContainer, I
 
 
         // Read in the bagsResult if there is one.
-        final BagsResult bagsResult = BagsResult$.MODULE$.asJava().decode(parent.getParamSet(BAGS_RESULT_PARAM_SET_NAME));
+        final BagsResult.JavaCompanionAPI mod = BagsResult$.MODULE$.asJava();
+        final ParamSet bps = parent.getParamSet(BAGS_RESULT_PARAM_SET_NAME);
+        final BagsResult bagsResult = (bps == null) ? mod.noSearchPerformed() : mod.decode(bps);
 
         // Primary index.
         final int primaryIndex = Pio.getIntValue(parent, "primary", -1);

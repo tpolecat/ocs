@@ -26,7 +26,12 @@ public class Pre2010BTargetEnvironmentIoTest {
     }
 
     private static TargetEnvironment parse(String name) throws Exception {
-        return TargetEnvironment.fromParamSet(load(name));
+        try {
+            return TargetEnvironment.fromParamSet(load(name));
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw e;
+        }
     }
 
     // We're not trying to verify the entire SPTarget parsing code.  It's
