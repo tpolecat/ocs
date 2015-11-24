@@ -1,5 +1,6 @@
 package edu.gemini.spModel.target.env
 
+import edu.gemini.pot.sp.ISPObservation
 import edu.gemini.shared.util.immutable.{Option => GOption}
 import edu.gemini.spModel.pio.codec.{PioError, GeneralError, ParseError, ParamSetCodec}
 import edu.gemini.spModel.pio.ParamSet
@@ -25,8 +26,13 @@ sealed trait BagsResult extends Product with Serializable with Cloneable { outer
   def targetOption: Option[SPTarget] =
     fold(None, _ => None, (_, t) => Some(t))
 
-  def versionMapOption: Option[BagsChecksum] =
+  def checksumOption: Option[BagsChecksum] =
     fold(None, Some(_), (m, _) => Some(m))
+
+  def isStale(o: ISPObservation): Boolean = {
+    println("***** BagsResult.isStale " + o)
+    fold(true, _.isConsistentWithObservation(o), (c, _) => c.isConsistentWithObservation(o))
+  }
 
   // def rather than val so we don't have to serialize
   def asJava: JavaAPI =
@@ -37,8 +43,8 @@ sealed trait BagsResult extends Product with Serializable with Cloneable { outer
     def targetOption: GOption[SPTarget] =
       outer.targetOption.asGeminiOpt
 
-    def versionMapOption: GOption[BagsChecksum] =
-      outer.versionMapOption.asGeminiOpt
+    def checksumOption: GOption[BagsChecksum] =
+      outer.checksumOption.asGeminiOpt
 
     def encode(key: String): ParamSet =
       BagsResult.BagsResultCodec.encode(key, outer)

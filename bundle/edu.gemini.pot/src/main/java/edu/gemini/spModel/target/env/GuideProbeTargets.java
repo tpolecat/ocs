@@ -118,21 +118,21 @@ public final class GuideProbeTargets implements Serializable, TargetContainer, I
         return new GuideProbeTargets(guider, DEFAULT_BAGS_RESULT, primaryTarget, DefaultImList.create(manualTargets));
     }
 
-    /**
-     * Creates a GuideTargets instance associated with the given
-     * {@link GuideProbe}.
-     *
-     * @param guider guide probe to associate with the GuideTargets
-     * @param bagsResult the result of performing a BAGS search
-     * @param primaryTarget the primary target, which must be either the BAGS target or in the targets list
-     * @param manualTargets zero or more manual targets
-     *
-     * @return a new GuideTargets object with the given targets
-     */
-    public static GuideProbeTargets create(final GuideProbe guider, final BagsResult bagsResult,
-                                           final Option<SPTarget> primaryTarget, final SPTarget... manualTargets) {
-        return new GuideProbeTargets(guider, bagsResult, primaryTarget, DefaultImList.create(manualTargets));
-    }
+//    /**
+//     * Creates a GuideTargets instance associated with the given
+//     * {@link GuideProbe}.
+//     *
+//     * @param guider guide probe to associate with the GuideTargets
+//     * @param bagsResult the result of performing a BAGS search
+//     * @param primaryTarget the primary target, which must be either the BAGS target or in the targets list
+//     * @param manualTargets zero or more manual targets
+//     *
+//     * @return a new GuideTargets object with the given targets
+//     */
+//    public static GuideProbeTargets create(final GuideProbe guider, final BagsResult bagsResult,
+//                                           final Option<SPTarget> primaryTarget, final SPTarget... manualTargets) {
+//        return new GuideProbeTargets(guider, bagsResult, primaryTarget, DefaultImList.create(manualTargets));
+//    }
 
     /**
      * Creates a GuideTargets instance associated with the given
@@ -164,23 +164,23 @@ public final class GuideProbeTargets implements Serializable, TargetContainer, I
         return new GuideProbeTargets(guider, DEFAULT_BAGS_RESULT, primaryTarget, manualTargets);
     }
 
-    /**
-     * Creates a GuideTargets instance associated with the given
-     * {@link GuideProbe}.  It has no primary star if no targets are provided
-     * (i.e., <code>targetList.isEmpty()</code>, otherwise it selects the first
-     * target in the list.
-     *
-     * @param guider guider to associate with these targets
-     * @param bagsResult the result of performing a BAGS search
-     * @param primaryTarget the primary target, which must be either the BAGS target or in the targets list
-     * @param manualTargets a list of the manual targets
-     *
-     * @return a new GuideTargets object with the given targets
-     */
-    public static GuideProbeTargets create(final GuideProbe guider, final BagsResult bagsResult,
-                                           final Option<SPTarget> primaryTarget, final ImList<SPTarget> manualTargets) {
-        return new GuideProbeTargets(guider, bagsResult, primaryTarget, manualTargets);
-    }
+//    /**
+//     * Creates a GuideTargets instance associated with the given
+//     * {@link GuideProbe}.  It has no primary star if no targets are provided
+//     * (i.e., <code>targetList.isEmpty()</code>, otherwise it selects the first
+//     * target in the list.
+//     *
+//     * @param guider guider to associate with these targets
+//     * @param bagsResult the result of performing a BAGS search
+//     * @param primaryTarget the primary target, which must be either the BAGS target or in the targets list
+//     * @param manualTargets a list of the manual targets
+//     *
+//     * @return a new GuideTargets object with the given targets
+//     */
+//    public static GuideProbeTargets create(final GuideProbe guider, final BagsResult bagsResult,
+//                                           final Option<SPTarget> primaryTarget, final ImList<SPTarget> manualTargets) {
+//        return new GuideProbeTargets(guider, bagsResult, primaryTarget, manualTargets);
+//    }
 
 
     private final GuideProbe guider;

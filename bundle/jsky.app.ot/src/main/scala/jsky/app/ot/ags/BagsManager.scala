@@ -13,7 +13,7 @@ import edu.gemini.spModel.core.SPProgramID
 import edu.gemini.spModel.obs.ObservationStatus
 import edu.gemini.spModel.obs.context.ObsContext
 import edu.gemini.spModel.rich.shared.immutable._
-import edu.gemini.spModel.target.env.{BagsResult, OptionsList, GuideProbeTargets, TargetEnvironment}
+import edu.gemini.spModel.target.env.{BagsChecksum, BagsResult, OptionsList, GuideProbeTargets, TargetEnvironment}
 import jsky.app.ot.OT
 import jsky.app.ot.tpe.{TpeContext, GuideStarSupport, GemsGuideStarWorker, GuideStarWorker}
 
@@ -97,7 +97,7 @@ final class BagsManager(executor: ScheduledThreadPoolExecutor) {
    * a delay of at least `delay` milliseconds.
    */
   def enqueue(observation: ISPObservation, delay: Long, initialEnqueue: Boolean = false): Unit =
-    Option(observation).foreach { obs =>
+    Option(observation).filter(BagsManager.isStale).foreach { obs =>
       synchronized {
         val key = obs.getNodeKey
         state += key
@@ -239,5 +239,23 @@ object BagsManager {
       }
     }
     oldEnv.setGuideEnvironment(newGuideEnv)
+  }
+
+  /** True if this observation contains stale BAGS results (or has never had a BAGS lookup). */
+  def isStale(o: ISPObservation): Boolean = {
+    val res =
+    ObsContext.create(o).asScalaOpt.map { oc =>
+      val brs = oc.getTargets
+        .getGroups.asScalaList
+        .flatMap(_.getAll.asScalaList)
+        .map(_.getBagsResult)
+
+      println("***** bags results = " + brs)
+
+      brs.isEmpty || brs.exists(_.isStale(o))
+
+    } getOrElse true
+    println("***** " + o.getObservationID + " stale? " + res)
+    res
   }
 }

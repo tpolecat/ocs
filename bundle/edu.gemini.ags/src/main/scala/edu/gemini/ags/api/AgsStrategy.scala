@@ -16,6 +16,7 @@ import edu.gemini.spModel.target.env.{BagsResult, GuideProbeTargets, TargetEnvir
 import edu.gemini.spModel.target.system.HmsDegTarget
 
 import scala.concurrent.Future
+import scalaz.NonEmptyList
 
 trait AgsStrategy {
   def key: AgsStrategyKey
@@ -86,11 +87,15 @@ object AgsStrategy {
      * the Selection.
      */
     def applyTo(env: TargetEnvironment, f: SPTarget => BagsResult): TargetEnvironment =
-      (env /: assignments) { (curEnv, ass) =>
-        val target = new SPTarget(HmsDegTarget.fromSkyObject(ass.guideStar.toOldModel))
-        val oldGpt = curEnv.getPrimaryGuideProbeTargets(ass.guideProbe).asScalaOpt
-        val newGpt = oldGpt.getOrElse(GuideProbeTargets.create(ass.guideProbe)).withBagsResult(f(target))
-        curEnv.putPrimaryGuideProbeTargets(newGpt)
+      assignments.foldLeft(env) { case (curEnv, Assignment(probe, star)) =>
+        curEnv.putPrimaryGuideProbeTargets {
+          curEnv
+            .getPrimaryGuideProbeTargets(probe)
+            .getOrElse(GuideProbeTargets.create(probe))
+            .withBagsResult(f(new SPTarget(HmsDegTarget.fromSkyObject(star.toOldModel))))
+        }
       }
+
+
   }
 }

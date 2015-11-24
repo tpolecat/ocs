@@ -17,15 +17,14 @@ class GemsGuideStarWorkerHelper {
   def applyResults(ctx: TpeContext,  gemsGuideStarsOpt: Option[GemsGuideStars], isBags: Boolean): Unit = {
 
     // Update the position angle, if needed, and if so return the inst node key
-    val instNodeKey: Option[SPNodeKey] = gemsGuideStarsOpt.flatMap { gemsGuideStars =>
+    val instNodeKey: Option[SPNodeKey] = gemsGuideStarsOpt.map(_.pa.toDegrees).flatMap { newPosAngle =>
       val inst: Option[SPInstObsComp] = ctx.instrument.dataObject
-      val newPosAngle: Double = gemsGuideStars.pa.toDegrees
       inst.filter(_.getPosAngleDegrees != newPosAngle).flatMap { inst =>
         inst.setPosAngleDegrees(newPosAngle)
         ctx.instrument.commit();
         ctx.instrument.shell.map(_.getNodeKey)
       }
-    };
+    }
 
     // The target node key, if any
     val tgtNodeKey: Option[SPNodeKey] =
@@ -38,47 +37,60 @@ class GemsGuideStarWorkerHelper {
       BagsResult.WithTarget(crc1, _)
     }
 
+    // Update the TargetObsComp with the GEMS result
     ctx.targets.dataObject.foreach { targetObsComp =>
 
-      val oldEnv: TargetEnvironment = targetObsComp.getTargetEnvironment
+      // Our original new target environments
+      val oldTargetEnv: TargetEnvironment = targetObsComp.getTargetEnvironment
+      val newTargetEnv: TargetEnvironment = gemsGuideStarsOpt.map(_.guideGroup) match {
+        case Some(gemsGuideGroup) if isBags =>
 
-      // If this is called from BAGS, we need to find out if there was a previous BAGS guide group and whether
-      // or not it was the primary group.
-      val (makeBagsGroupPrimary, clearedEnv) =
-        if (isBags) {
-          val guideEnv: GuideEnvironment    = oldEnv.getGuideEnvironment
-          val bagsGroup: Option[GuideGroup] = guideEnv.getOptions.asScalaList.find(_.getAll.asScalaList.exists(_.primaryIsBagsTarget))
-          val b = guideEnv.getOptions.isEmpty || bagsGroup.exists(bg => oldEnv.getGuideEnvironment.getPrimary.asScalaOpt.exists(bg == _))
-          val e = BagsManager.clearBagsTargets(oldEnv)
-          (b, e)
-      } else (false, oldEnv)
+          // Update GuideProbeTargets to reflect the fact that the result came from BAGS
+          val updatedGuideProbeTargets: List[GuideProbeTargets] =
+            gemsGuideGroup.getAll.asScalaList.map { gpts =>
+              gpts.getPrimary.asScalaOpt match {
+                case Some(t) => gpts.removeTarget(t).withBagsResult(f(t))
+                case None    => gpts
+              }
+            }
 
-      // If this is BAGS running, denote the primary selected targets as the BAGS targets.
-      // This is a horrible way to do things, but we don't want to mess with the actual GeMS lookup code so we
-      // transform the guide group as necessary for BAGS.
-      val finalEnv: TargetEnvironment = gemsGuideStarsOpt.map { gemsGuideStars =>
-        // Determine / adapt the new guide group representing the GeMS selection.
-        if (isBags) {
-          val gptList: List[GuideProbeTargets] = gemsGuideStars.guideGroup.getAll.asScalaList.map(gpt =>
-            gpt.getPrimary.asScalaOpt.map(primary => gpt.removeTarget(primary).withBagsResult(f(primary))).getOrElse(gpt)
-          )
-          val group = gemsGuideStars.guideGroup.putAll(gptList.asImList)
-          if (makeBagsGroupPrimary)
-            clearedEnv.setPrimaryGuideGroup(group)
-          else
-              clearedEnv.setGuideEnvironment(clearedEnv.getGuideEnvironment().setOptions(clearedEnv.getGroups().cons(group)));
-        } else {
-          val group = gemsGuideStars.guideGroup
-          clearedEnv.setPrimaryGuideGroup(group)
-        }
-      }.getOrElse(clearedEnv)
+          // Make the new bags group primary if there were no guide groups before, or if the old
+          // primary group was a BAGS group.
+          val makeBagsGroupPrimary = {
+            val oldGuideEnv = oldTargetEnv.getGuideEnvironment
+            oldGuideEnv.getOptions.isEmpty || oldGuideEnv.getPrimary.asScalaOpt.exists(isBagsGroup)
+          }
+
+          // The final target env
+          val clearedTargetEnv  = BagsManager.clearBagsTargets(oldTargetEnv)
+          val updatedGuideGroup = gemsGuideGroup.putAll(updatedGuideProbeTargets.asImList)
+          if (makeBagsGroupPrimary) {
+            clearedTargetEnv.setPrimaryGuideGroup(updatedGuideGroup)
+          } else {
+            val newGuideEnv = clearedTargetEnv.getGuideEnvironment().setOptions(clearedTargetEnv.getGroups().cons(updatedGuideGroup))
+            clearedTargetEnv.setGuideEnvironment(newGuideEnv)
+          }
+
+        case Some(gemsGuideGroup) => oldTargetEnv.setPrimaryGuideGroup(gemsGuideGroup)
+        case None                 => oldTargetEnv
+
+      }
 
       // If BAGS is running, only change if the target environments differ.
-      if (!isBags || !BagsManager.bagsTargetsMatch(oldEnv, finalEnv)) {
-        targetObsComp.setTargetEnvironment(finalEnv)
+      if (!isBags || !BagsManager.bagsTargetsMatch(oldTargetEnv, newTargetEnv)) {
+        targetObsComp.setTargetEnvironment(newTargetEnv)
         ctx.targets.commit()
       }
 
     }
   }
+
+
+  /**
+   * A GuideGroup is considered to be a "BAGS group" if it contains at least one GuideProbeTargets
+   * where the primary target was assigned by BAGS. It's unclear how much sense this makes.
+   */
+  def isBagsGroup(gg: GuideGroup): Boolean =
+    gg.getAll.asScalaList.exists(_.primaryIsBagsTarget)
+
 }
