@@ -418,6 +418,7 @@ public final class EdCompTargetList extends OtItemEditor<ISPObsComponent, Target
             public void run() {
                 final TargetEnvironment env = getDataObject().getTargetEnvironment();
                 updateTargetDetails(env);
+                _w.positionTable.reinit(newTOC, false);
             }
         });
 
