@@ -27,13 +27,12 @@ class TargetMigrationTest extends Specification with MigrationTest {
   }
 
   "2016B Target Migration" should {
-
     "Migrate TOO Target" in withTestProgram2("targetMigrationToo.xml") { p =>
       p.findBaseByObsTitle("origin") must_== Some(
         TooTarget("zero")
       )
     }
-    
+
     "Migrate Sidereal Target at the Origin" in withTestProgram2("targetMigration.xml") { p =>
       p.findBaseByObsTitle("origin") must_== Some(
         SiderealTarget(
@@ -118,6 +117,23 @@ class TargetMigrationTest extends Specification with MigrationTest {
       findNoteTextByPath(p, "jpl-minor-body", "Migration: halley").exists(_ contains "EC: 0.9671429084623044")
     }
 
+    "Migrate 2016B-1 NonSidereal Targets" in withTestProgram2("targetMigration2016B-2.xml") { p =>
+      p.findBaseByObsTitle("Ganymede").exists {
+        case NonSiderealTarget("Ganymede", e, Some(MajorBody(503)), Nil, None, None) =>
+          (e.size == 1362) && e.data.findMin.exists {
+            case (time, coords) =>
+              val coords = Coordinates.fromDegrees(173.92915291666668, 3.97539527777775).get
+              val ra     = Angle.formatHMS(coords.ra.toAngle)
+              val dec    = Declination.formatDMS(coords.dec)
+              (time == 1451581200000l) && (ra == "11:35:42.997") && (dec == "03:58:31.42")
+            case _              =>
+              false
+          }
+
+        case _ =>
+          false
+      }
+    }
   }
 
   def findNoteTextByPath(n: ISPNode, title: String, more: String*): Option[String] =

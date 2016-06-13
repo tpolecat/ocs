@@ -3,6 +3,7 @@ package edu.gemini.spModel.io.impl.migration
 import edu.gemini.pot.sp.SPComponentType
 import edu.gemini.spModel.pio.{Container, ContainerParent, ParamSet}
 
+import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 import scala.util.Try
 
@@ -38,7 +39,7 @@ object PioSyntax {
 
   }
 
-  implicit class ParamSetOps(p: ParamSet) {
+  implicit final class ParamSetOps(p: ParamSet) {
 
     def paramSets: List[ParamSet] =
       p.getParamSets.asScala.toList
@@ -54,6 +55,9 @@ object PioSyntax {
     def double(key: String): Option[Double] =
       Option(p.getParam(key)).map(_.getValue.toDouble)
 
+    @tailrec
+    def removeChildren(name: String): Unit =
+      if (p.removeChild(name) == null) () else removeChildren(name)
   }
 
 }
