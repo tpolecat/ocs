@@ -8,8 +8,14 @@ import scalaz._, Scalaz._
 final class Ephemeris(val site: Site, val compressedData: Deflated[List[(Long, Float, Float)]]) extends Serializable {
 
   // Internal state for managing the inflated ephemeris data.
-  @transient @volatile private var _data: Long ==>> Coordinates = null
-  @transient @volatile private var _task: TimerTask = null
+  @transient private var _data: Long ==>> Coordinates = null
+  @transient private var _task: TimerTask = null
+
+  // Cache of data used in Phase 2 checking and database queries.  Avoids
+  // expanding compressed ephemeris data in many cases.
+  private final case class Cache(time: Long, size: Int, pos: Option[Coordinates], closest: Option[(Long, Coordinates)])
+
+  @transient private var _cache: Cache = null
 
   /**
    * A map from time to coordinates. This value is stored in compressed form and is deflated (and
@@ -40,10 +46,28 @@ final class Ephemeris(val site: Site, val compressedData: Deflated[List[(Long, F
     _data
 
   }
-    
+
+  private def cacheAt(time: Long): Cache = synchronized {
+    _cache = Option(_cache).filter(_.time === time).getOrElse {
+      val eph = data // decompress if necessary
+      Cache(time, eph.size, eph.iLookup(time), eph.lookupAssoc(time))
+    }
+    _cache
+  }
+
+  private def cacheAnyTime: Cache = synchronized {
+    _cache = Option(_cache).getOrElse {
+      val eph = data // decompress if necessary
+      eph.findMin.fold(Cache(0, 0, None, None)) { case (time, coords) =>
+        Cache(time, eph.size, some(coords), some((time, coords)))
+      }
+    }
+    _cache
+  }
+
   /** Perform an exact or interpolated lookup. */
   def iLookup(k: Long): Option[Coordinates] =
-    data.iLookup(k)
+    cacheAt(k).pos
 
   /** Construct an exact or interpolated slice. */
   def iSlice(lo: Long, hi: Long): Option[Ephemeris] =
@@ -55,7 +79,7 @@ final class Ephemeris(val site: Site, val compressedData: Deflated[List[(Long, F
 
   /** Number of elements in the ephemeris. */
   def size: Int =
-    data.size
+    cacheAnyTime.size
 
   /** Ephemeris elements as an association list. */
   def toList: List[(Long, Coordinates)] =
@@ -63,7 +87,7 @@ final class Ephemeris(val site: Site, val compressedData: Deflated[List[(Long, F
 
   /** Are there no elements? */
   def isEmpty: Boolean =
-    data.isEmpty
+    size == 0
 
   /** Is there at least one element? */
   def nonEmpty: Boolean =
@@ -71,22 +95,22 @@ final class Ephemeris(val site: Site, val compressedData: Deflated[List[(Long, F
 
   /** Find the closest matching element, if any. */
   def lookupClosestAssoc(k: Long): Option[(Long, Coordinates)] =
-    data.lookupClosestAssoc(k)
+    cacheAt(k).closest
 
   /** Find the closest matching Coordinates, if any. */
   def lookupClosest(k: Long): Option[Coordinates] =
-    data.lookupClosest(k)
+    lookupClosestAssoc(k).map(_._2)
 
   /** Find the closest matching time, if any. */
   def lookupClosestKey(k: Long): Option[Long] =
-    data.lookupClosestKey(k)
+    lookupClosestAssoc(k).map(_._1)
 
   /** Copy. */
   def copy(site: Site = site, data: (Long ==>> Coordinates) = data): Ephemeris =
     Ephemeris.apply(site, data)
 
   override def equals(a: Any): Boolean =
-    a match { 
+    a match {
       case e: Ephemeris => e.site == site && e.compressedData == compressedData
       case _            => false
     }
@@ -116,7 +140,6 @@ object Ephemeris extends EphemerisInstances with EphemerisLenses {
       (t, cs.ra.toDegrees.toFloat, cs.dec.toDegrees.toFloat)
     }))
   }
-
 }
 
 trait EphemerisInstances {
